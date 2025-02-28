@@ -11,48 +11,44 @@ declare_id!("TCJikbbbyU65XnjPniSsoPuo2fGgj6DjweJ8RRQ6KCq");
 mod hello_anchor {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, space: u64, amount: u64, seed: String) -> Result<()> {
-        let from = &ctx.accounts.from;
-        let to = &ctx.accounts.to;
-        let base = &ctx.accounts.base;
-        let sys_pro = &ctx.accounts.system_program;
+   pub fn initialize(ctx: Context<Initialize>, space: u64, amount: u64, seed: String) -> Result<()> {
+    let from = &ctx.accounts.from;
+    let to = &ctx.accounts.to;
+    let base = &ctx.accounts.base;
+    let sys_pro = &ctx.accounts.system_program;
 
-        msg!("Creating account with seed...");
-        msg!("Base: {}", base.key());
-        msg!("Seed: {}", seed);
+    msg!("Creating account with seed...");
+    msg!("Base: {}", base.key());
+    msg!("Seed: {}", seed);
 
-        let (expected_pda, bump) = Pubkey::find_program_address(&[seed.as_bytes(), base.key().as_ref()], &ctx.program_id);
-        msg!("Expected PDA: {}", expected_pda);
-        msg!("Provided PDA: {}", to.key());
+    
+    let ix = create_account_with_seed(
+        &from.key(),
+        &to.key(),
+        &base.key(),
+        &seed,
+        amount,
+        space,
+        &ctx.program_id,
+    );
 
-        require_keys_eq!(expected_pda, to.key(), CustomError::PDA_Mismatch);
+    let base_key = base.key(); // ✅ Store in variable to prevent temporary value issue
+    let seeds = &[seed.as_bytes(), base_key.as_ref()]; // ✅ Now seeds is valid
 
-        let rent_exempt_amount = Rent::get()?.minimum_balance(space as usize);
+    invoke_signed(
+        &ix,
+        &[
+            from.to_account_info(),
+            to.to_account_info(),
+            base.to_account_info(),
+            sys_pro.to_account_info(),
+        ],
+        &[seeds], // ✅ Now seeds has a valid reference
+    )?;
+    
+    Ok(())
+}
 
-        let ix = create_account_with_seed(
-            &from.key(),
-            &to.key(),
-            &base.key(),
-            &seed,
-            rent_exempt_amount.max(amount),
-            space,
-            &ctx.program_id,
-        );
-
-        let seeds = &[seed.as_bytes(), base.key().as_ref(), &[bump]];
-
-        invoke_signed(
-            &ix,
-            &[
-                from.to_account_info(),
-                to.to_account_info(),
-                base.to_account_info(),
-                sys_pro.to_account_info(),
-            ],
-            &[seeds],
-        )?;
-        Ok(())
-    }
 }
 
 #[derive(Accounts)]
